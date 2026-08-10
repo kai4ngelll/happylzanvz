@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>С Днём Рождения, Лиза</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#050b1a;
+    --bg-mid:#0c1b38;
+    --bg-soft:#12254a;
+    --ice:#8fd3f4;
+    --peri:#b9c8ff;
+    --text:#eef3fb;
+    --muted:#93a5cc;
+    --gold:#ffd98a;
+    --pink:#ff9fc7;
+    --violet:#b18cff;
+    --glass:rgba(255,255,255,0.06);
+    --glass-border:rgba(255,255,255,0.14);
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  html,body{
+    height:100%;
+    background:var(--bg-deep);
+    color:var(--text);
+    font-family:'Manrope', sans-serif;
+    overflow:hidden;
+  }
+
+  body{
+    position:relative;
+    min-height:100vh;
+    width:100%;
+  }
+
+  /* ambient starry / nebula background, shared by all screens */
+  .sky{
+    position:fixed;
+    inset:0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(143,211,244,0.16), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 80% 100%, rgba(177,140,255,0.10), transparent 60%),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-mid) 55%, var(--bg-deep) 100%);
+    z-index:0;
+  }
+
+  .stars{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+  }
+  .stars span{
+    position:absolute;
+    width:2px;
+    height:2px;
+    background:var(--peri);
+    border-radius:50%;
+    opacity:0.5;
+    animation:twinkle 4s ease-in-out infinite;
+  }
+  @keyframes twinkle{
+    0%,100%{opacity:0.15; transform:scale(1);}
+    50%{opacity:0.9; transform:scale(1.6);}
+  }
+
+  .screen{
+    position:relative;
+    z-index:1;
+    min-height:100vh;
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    opacity:0;
+    visibility:hidden;
+    position:fixed;
+    inset:0;
+    transition:opacity 0.7s ease;
+  }
+  .screen.active{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+  }
+  .screen:not(.active){
+    pointer-events:none;
+  }
+
+  /* ---------- Question screen ---------- */
+  .card{
+    position:relative;
+    width:100%;
+    max-width:420px;
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    border-radius:28px;
+    padding:52px 36px 44px;
+    text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:18px;
+  }
+
+  .question{
+    font-family:'Playfair Display', serif;
+    font-weight:600;
+    font-size:clamp(28px, 6vw, 38px);
+    line-height:1.25;
+    color:var(--text);
+    margin-bottom:36px;
+    text-wrap:balance;
+  }
+
+  .glow-orb{
+    position:absolute;
+    top:-60px;
+    left:50%;
+    transform:translateX(-50%);
+    width:180px;
+    height:180px;
+    background:radial-gradient(circle, rgba(143,211,244,0.35), transparent 70%);
+    filter:blur(10px);
+    z-index:-1;
+    animation:float 6s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{transform:translateX(-50%) translateY(0);}
+    50%{transform:translateX(-50%) translateY(14px);}
+  }
+
+  .btn-row{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+  }
+
+  button{
+    font-family:'Manrope', sans-serif;
+    font-weight:700;
+    font-size:16px;
+    border-radius:999px;
+    padding:14px 34px;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition:transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+  button:active{ transform:scale(0.96); }
+  button:focus-visible{
+    outline:2px solid var(--ice);
+    outline-offset:3px;
+  }
+
+  .btn-yes{
+    background:linear-gradient(135deg, var(--ice), var(--peri));
+    color:#0a1730;
+    box-shadow:0 8px 24px rgba(143,211,244,0.35);
+  }
+  .btn-yes:hover{ box-shadow:0 10px 30px rgba(143,211,244,0.5); transform:translateY(-2px); }
+
+  .btn-no{
+    background:transparent;
+    color:var(--muted);
+    border-color:var(--glass-border);
+  }
+  .btn-no:hover{ color:var(--text); border-color:var(--peri); }
+
+  /* ---------- Modal (Нет) ---------- */
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(3,7,18,0.72);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity 0.35s ease;
+    padding:24px;
+  }
+  .modal-overlay.active{ opacity:1; visibility:visible; }
+
+  .modal{
+    background:var(--bg-soft);
+    border:1px solid var(--glass-border);
+    border-radius:22px;
+    padding:34px 30px;
+    max-width:340px;
+    width:100%;
+    text-align:center;
+    box-shadow:0 25px 70px rgba(0,0,0,0.55);
+    transform:translateY(14px) scale(0.97);
+    transition:transform 0.35s ease;
+  }
+  .modal-overlay.active .modal{ transform:translateY(0) scale(1); }
+
+  .modal p{
+    font-size:16px;
+    line-height:1.5;
+    color:var(--text);
+    margin-bottom:22px;
+  }
+
+  .btn-reload{
+    background:linear-gradient(135deg, var(--peri), var(--violet));
+    color:#0a1730;
+    width:100%;
+    box-shadow:0 8px 24px rgba(177,140,255,0.35);
+  }
+  .btn-reload:hover{ box-shadow:0 10px 30px rgba(177,140,255,0.5); }
+
+  /* ---------- Balloons screen ---------- */
+  #screen-balloons{
+    overflow:hidden;
+  }
+  .balloons-label{
+    position:relative;
+    z-index:2;
+    font-family:'Playfair Display', serif;
+    font-style:italic;
+    font-size:20px;
+    color:var(--peri);
+    opacity:0.8;
+    letter-spacing:0.02em;
+    animation:pulseText 2s ease-in-out infinite;
+  }
+  @keyframes pulseText{
+    0%,100%{opacity:0.5;}
+    50%{opacity:0.95;}
+  }
+
+  .balloon{
+    position:absolute;
+    bottom:-140px;
+    border-radius:50% 50% 50% 50% / 58% 58% 42% 42%;
+    opacity:0.95;
+    box-shadow:inset -8px -10px 18px rgba(0,0,0,0.18), inset 6px 8px 14px rgba(255,255,255,0.25);
+  }
+  .balloon::after{
+    content:"";
+    position:absolute;
+    bottom:-30px;
+    left:50%;
+    width:1px;
+    height:34px;
+    background:rgba(255,255,255,0.25);
+    transform:translateX(-50%);
+  }
+  .balloon::before{
+    content:"";
+    position:absolute;
+    top:14%;
+    left:24%;
+    width:22%;
+    height:16%;
+    background:rgba(255,255,255,0.45);
+    border-radius:50%;
+    filter:blur(1px);
+  }
+
+  @keyframes rise{
+    0%{ transform:translateY(0) translateX(0) rotate(0deg); }
+    50%{ transform:translateY(-58vh) translateX(var(--drift, 20px)) rotate(var(--rot, 6deg)); }
+    100%{ transform:translateY(-125vh) translateX(0) rotate(0deg); }
+  }
+
+  /* ---------- Birthday screen ---------- */
+  #screen-birthday .content{
+    position:relative;
+    z-index:2;
+    text-align:center;
+    max-width:560px;
+    padding:0 16px;
+  }
+
+  .headline{
+    font-family:'Playfair Display', serif;
+    font-weight:700;
+    font-size:clamp(34px, 7.5vw, 60px);
+    line-height:1.15;
+    background:linear-gradient(135deg, #ffffff 10%, var(--ice) 55%, var(--peri) 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    text-wrap:balance;
+    animation:appear 1.1s ease both;
+  }
+
+  .headline .accent{
+    font-style:italic;
+    background:linear-gradient(135deg, var(--gold), var(--pink));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .subline{
+    margin-top:22px;
+    font-size:clamp(15px, 2.4vw, 18px);
+    color:var(--muted);
+    line-height:1.7;
+    animation:appear 1.1s ease 0.35s both;
+  }
+
+  .divider{
+    width:56px;
+    height:2px;
+    margin:26px auto;
+    background:linear-gradient(90deg, transparent, var(--ice), transparent);
+    animation:appear 1.1s ease 0.2s both;
+  }
+
+  @keyframes appear{
+    from{ opacity:0; transform:translateY(16px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .float-balloon{
+    position:absolute;
+    animation:driftSlow 9s ease-in-out infinite;
+    opacity:0.85;
+  }
+  @keyframes driftSlow{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-22px); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration:0.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:0.01ms !important;
+    }
+  }
+
+  @media (max-width:420px){
+    .card{ padding:44px 24px 36px; }
+    .btn-row{ flex-direction:column; }
+    button{ width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="stars" id="stars"></div>
+
+<!-- Screen 1: question -->
+<section class="screen active" id="screen-question">
+  <div class="card">
+    <div class="glow-orb"></div>
+    <div class="eyebrow">Личное сообщение</div>
+    <h1 class="question">Ты&nbsp;Лиза?</h1>
+    <div class="btn-row">
+      <button class="btn-yes" id="btn-yes">Да</button>
+      <button class="btn-no" id="btn-no">Нет</button>
+    </div>
+  </div>
+</section>
+
+<!-- Screen 2: balloons rising -->
+<section class="screen" id="screen-balloons">
+  <div class="balloons-label">секунду…</div>
+  <div id="balloon-field"></div>
+</section>
+
+<!-- Screen 3: birthday -->
+<section class="screen" id="screen-birthday">
+  <div class="content">
+    <h1 class="headline">С Днём Рождения,<br><span class="accent">Лиза!</span></h1>
+    <div class="divider"></div>
+    <p class="subline">Пусть этот день будет таким же светлым, как ты сама —<br>
+    с теплом близких, красивыми моментами и поводом улыбаться почаще.<br>
+    С праздником! 🩵</p>
+  </div>
+</section>
+
+<!-- Modal for "Нет" -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <p>Кажется, произошла ошибка.<br>Пожалуйста, перезагрузите страницу.</p>
+    <button class="btn-reload" id="btn-reload">Перезагрузить</button>
+  </div>
+</div>
+
+<script>
+  // --- background stars ---
+  const starsContainer = document.getElementById('stars');
+  const STAR_COUNT = 60;
+  for(let i=0;i<STAR_COUNT;i++){
+    const s = document.createElement('span');
+    s.style.left = Math.random()*100 + 'vw';
+    s.style.top = Math.random()*100 + 'vh';
+    s.style.animationDelay = (Math.random()*4) + 's';
+    s.style.width = s.style.height = (Math.random()*1.6+1) + 'px';
+    starsContainer.appendChild(s);
+  }
+
+  const screenQuestion = document.getElementById('screen-question');
+  const screenBalloons = document.getElementById('screen-balloons');
+  const screenBirthday = document.getElementById('screen-birthday');
+  const modalOverlay = document.getElementById('modal-overlay');
+
+  function showScreen(el){
+    [screenQuestion, screenBalloons, screenBirthday].forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // --- "Нет" -> modal -> reload ---
+  document.getElementById('btn-no').addEventListener('click', () => {
+    modalOverlay.classList.add('active');
+  });
+  document.getElementById('btn-reload').addEventListener('click', () => {
+    location.reload();
+  });
+
+  // --- "Да" -> balloons -> birthday ---
+  const balloonColors = ['#8fd3f4', '#b9c8ff', '#ffd98a', '#ff9fc7', '#b18cff', '#a9e8ff'];
+
+  function launchBalloons(){
+    const field = document.getElementById('balloon-field');
+    field.innerHTML = '';
+    const count = 22;
+    for(let i=0;i<count;i++){
+      const b = document.createElement('div');
+      b.className = 'balloon';
+      const size = 46 + Math.random()*38;
+      const left = Math.random()*94;
+      const delay = Math.random()*1.1;
+      const duration = 2.6 + Math.random()*1.6;
+      const drift = (Math.random()*80 - 40) + 'px';
+      const rot = (Math.random()*16 - 8) + 'deg';
+      const color = balloonColors[Math.floor(Math.random()*balloonColors.length)];
+
+      b.style.width = size + 'px';
+      b.style.height = (size*1.18) + 'px';
+      b.style.left = left + 'vw';
+      b.style.background = `radial-gradient(circle at 35% 30%, ${color}, ${color}cc 60%, ${color}88 100%)`;
+      b.style.setProperty('--drift', drift);
+      b.style.setProperty('--rot', rot);
+      b.style.animation = `rise ${duration}s ease-in ${delay}s forwards`;
+
+      field.appendChild(b);
+    }
+  }
+
+  document.getElementById('btn-yes').addEventListener('click', () => {
+    showScreen(screenBalloons);
+    launchBalloons();
+    setTimeout(() => {
+      showScreen(screenBirthday);
+      addFloatingBalloons();
+    }, 3200);
+  });
+
+  // a few gentle floating balloons lingering in the birthday background
+  function addFloatingBalloons(){
+    const host = screenBirthday;
+    if(host.querySelector('.float-balloon')) return;
+    const positions = [
+      {left:'8%', top:'14%', size:34, color:'#8fd3f4'},
+      {left:'86%', top:'20%', size:26, color:'#ffd98a'},
+      {left:'14%', top:'78%', size:22, color:'#ff9fc7'},
+      {left:'90%', top:'72%', size:30, color:'#b18cff'}
+    ];
+    positions.forEach((p, idx) => {
+      const b = document.createElement('div');
+      b.className = 'float-balloon';
+      b.style.left = p.left;
+      b.style.top = p.top;
+      b.style.width = p.size + 'px';
+      b.style.height = (p.size*1.18) + 'px';
+      b.style.borderRadius = '50% 50% 50% 50% / 58% 58% 42% 42%';
+      b.style.background = `radial-gradient(circle at 35% 30%, ${p.color}, ${p.color}cc 60%, ${p.color}88 100%)`;
+      b.style.animationDelay = (idx*0.6) + 's';
+      host.appendChild(b);
+    });
+  }
+</script>
+
+</body>
+</html>
