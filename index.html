@@ -51,46 +51,13 @@
     inset:0;
     z-index:0;
     pointer-events:none;
-    overflow:hidden;
-  }
-
-  .fw-burst{
-    position:absolute;
-    width:0;
-    height:0;
-    pointer-events:none;
-  }
-  .fw-flash{
-    position:absolute;
-    top:-4px; left:-4px;
-    width:8px; height:8px;
-    border-radius:50%;
-    background:var(--fw-color, var(--ink));
-    animation:fwFlash 0.55s ease-out forwards;
-    will-change:transform, opacity;
-  }
-  .fw-particle{
-    position:absolute;
-    top:-2px; left:-2px;
-    width:4px; height:4px;
-    border-radius:50%;
-    background:var(--fw-color, var(--ink));
-    transform:rotate(var(--angle)) translateY(0);
-    animation:fwParticle 1.05s cubic-bezier(.16,.6,.28,1) forwards;
-    will-change:transform, opacity;
-  }
-  @keyframes fwFlash{
-    0%{ transform:scale(0.5); opacity:0.9; }
-    100%{ transform:scale(2.6); opacity:0; }
-  }
-  @keyframes fwParticle{
-    0%{ transform:rotate(var(--angle)) translateY(0); opacity:1; }
-    65%{ opacity:0.75; }
-    100%{ transform:rotate(var(--angle)) translateY(var(--dist)); opacity:0; }
+    display:block;
+    width:100%;
+    height:100%;
   }
 
   @media (prefers-reduced-motion: reduce){
-    .fw-burst{ display:none; }
+    .fireworks-bg{ display:none; }
   }
 
   .mono{
@@ -541,13 +508,22 @@
     border-color:rgba(122,90,45,0.3);
   }
   .btn-close-letter:hover{ color:#3f2c14; border-color:#8a6a3a; background:rgba(122,90,45,0.06); }
+
+  .page-signature{
+    margin-top:36px;
+    text-align:center;
+    font-size:11px;
+    letter-spacing:0.28em;
+    color:var(--muted);
+    opacity:0.6;
+  }
 </style>
 
 </head>
 <body>
 
 <div class="sky"></div>
-<div class="fireworks-bg" id="fireworks-bg"></div>
+<canvas class="fireworks-bg" id="fireworks-bg"></canvas>
 <div class="stars" id="stars"></div>
 
 <!-- Screen 1: question -->
@@ -609,6 +585,8 @@
     </div>
 
     <div class="letter-gallery" id="letter-gallery"></div>
+
+    <div class="mono page-signature">by roretyu</div>
 
     <div class="rule bottom"></div>
   </div>
@@ -689,70 +667,218 @@
   buildVine('vine-left');
   buildVine('vine-right');
 
-  // --- live random fireworks (question screen only, perf-capped) ---
-  const fireworksField = document.getElementById('fireworks-bg');
-  const fwColors = ['#a34430', '#5c6b4e', '#a3823c', '#b6705a', '#7e3223', '#8a8f6b'];
-  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // --- live random fireworks (question screen only, perf-capped canvas salute) ---
+  (function(){
+    const canvas = document.getElementById('fireworks-bg');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const fwColors = ['#a34430', '#5c6b4e', '#a3823c', '#b6705a', '#7e3223', '#c9974f'];
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let fireworksActive = true;
-  let fireworksTimer = null;
-  let activeFireworkCount = 0;
-  const MAX_CONCURRENT_FIREWORKS = 3;
+    // cheap heuristic for weak devices: fewer CPU cores or small screen -> lighter show
+    const lowPower = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || Math.min(window.innerWidth, window.innerHeight) < 420;
+    const DPR = Math.min(window.devicePixelRatio || 1, lowPower ? 1 : 1.5);
+    const MAX_PARTICLES = lowPower ? 60 : 110;
+    const MAX_ROCKETS = lowPower ? 2 : 3;
+    const SPAWN_MIN = lowPower ? 650 : 400;
+    const SPAWN_RANGE = lowPower ? 500 : 400;
 
-  function spawnFirework(){
-    if(!fireworksActive || activeFireworkCount >= MAX_CONCURRENT_FIREWORKS) return;
+    let W = 0, H = 0;
+    function resize(){
+      W = canvas.clientWidth;
+      H = canvas.clientHeight;
+      canvas.width = Math.round(W * DPR);
+      canvas.height = Math.round(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
 
-    const cx = 10 + Math.random()*80;
-    const cy = 8 + Math.random()*62;
-    const color = fwColors[Math.floor(Math.random()*fwColors.length)];
-    const particleCount = 8 + Math.floor(Math.random()*4);
-    const radius = 40 + Math.random()*50;
+    let rockets = [];
+    let particles = [];
+    let fireworksActive = true;
+    let spawnTimer = null;
+    let rafId = null;
+    let lastT = 0;
 
-    const burst = document.createElement('div');
-    burst.className = 'fw-burst';
-    burst.style.left = cx + '%';
-    burst.style.top = cy + '%';
-    burst.style.setProperty('--fw-color', color);
-
-    const flash = document.createElement('div');
-    flash.className = 'fw-flash';
-    burst.appendChild(flash);
-
-    for(let i=0;i<particleCount;i++){
-      const angle = (360 / particleCount) * i + (Math.random()*16 - 8);
-      const dist = radius * (0.7 + Math.random()*0.5);
-      const p = document.createElement('div');
-      p.className = 'fw-particle';
-      p.style.setProperty('--angle', angle + 'deg');
-      p.style.setProperty('--dist', -dist + 'px');
-      burst.appendChild(p);
+    function hexToRgb(hex){
+      const v = parseInt(hex.slice(1), 16);
+      return [(v>>16)&255, (v>>8)&255, v&255];
+    }
+    const colorCache = {};
+    function rgbOf(hex){
+      if(!colorCache[hex]) colorCache[hex] = hexToRgb(hex);
+      return colorCache[hex];
     }
 
-    fireworksField.appendChild(burst);
-    activeFireworkCount++;
+    function spawnRocket(){
+      if(!fireworksActive || rockets.length >= MAX_ROCKETS) return;
+      const startX = W * (0.18 + Math.random()*0.64);
+      const startY = H + 10;
+      // slight natural tilt, not a runaway sideways drift
+      const targetX = Math.max(30, Math.min(W - 30, startX + (Math.random()*2 - 1) * W * 0.05));
+      const targetY = H * (0.14 + Math.random()*0.3);
+      const steps = 46 + Math.random()*18; // ~ frames at normalized 60fps units to reach apex
+      rockets.push({
+        x: startX,
+        y: startY,
+        vx: (targetX - startX) / steps,
+        vy: (targetY - startY) / steps,
+        targetY: targetY,
+        stepsLeft: steps,
+        color: fwColors[Math.floor(Math.random()*fwColors.length)],
+        trail: []
+      });
+    }
 
-    setTimeout(() => {
-      burst.remove();
-      activeFireworkCount--;
-    }, 1150);
-  }
+    function explode(x, y, color){
+      const budget = MAX_PARTICLES - particles.length;
+      if(budget <= 0) return;
+      const count = Math.max(0, Math.min(lowPower ? 22 : 34, budget));
+      const speedBase = lowPower ? 2.1 : 2.6;
+      for(let i=0;i<count;i++){
+        const angle = (Math.PI*2 * i) / count + (Math.random()*0.3 - 0.15);
+        const speed = speedBase * (0.55 + Math.random()*0.65);
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color,
+          life: 1,
+          decay: 0.011 + Math.random()*0.009,
+          size: 1.6 + Math.random()*1.4,
+          gravity: 0.028
+        });
+      }
+      // small bright flash at center
+      particles.push({
+        x, y, vx:0, vy:0, color:'#faf5e8',
+        life: 1, decay: 0.09, size: 8, gravity: 0, flash: true
+      });
+    }
 
-  function scheduleFirework(){
-    if(!fireworksActive) return;
-    spawnFirework();
-    const delay = 900 + Math.random()*900;
-    fireworksTimer = setTimeout(scheduleFirework, delay);
-  }
+    function step(t){
+      if(!fireworksActive){ rafId = null; return; }
+      if(!lastT) lastT = t;
+      const dt = Math.min(t - lastT, 48) / 16.67; // normalize to ~60fps steps, cap spikes
+      lastT = t;
+
+      // fade previous frame slightly for soft trails instead of full clear
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, W, H);
+
+      // rockets: rising trail + explode near target
+      for(let i = rockets.length - 1; i >= 0; i--){
+        const r = rockets[i];
+        r.trail.push({x: r.x, y: r.y});
+        if(r.trail.length > 6) r.trail.shift();
+        r.x += r.vx * dt;
+        r.y += r.vy * dt;
+        r.stepsLeft -= dt;
+
+        ctx.beginPath();
+        const rgb = rgbOf(r.color);
+        for(let j=0;j<r.trail.length;j++){
+          const p = r.trail[j];
+          const a = (j+1)/r.trail.length * 0.5;
+          ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+          ctx.fillRect(p.x-1, p.y-1, 2, 2);
+        }
+        ctx.fillStyle = '#faf5e8';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 1.6, 0, Math.PI*2);
+        ctx.fill();
+
+        if(r.y <= r.targetY || r.stepsLeft <= 0){
+          explode(r.x, r.y, r.color);
+          rockets.splice(i, 1);
+        }
+      }
+
+      // particles
+      for(let i = particles.length - 1; i >= 0; i--){
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += p.gravity * dt;
+        p.vx *= (1 - 0.012*dt);
+        p.life -= p.decay * dt;
+
+        if(p.life <= 0){
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const rgb = rgbOf(p.color) || [250,245,232];
+        if(p.flash){
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${p.life*0.8})`);
+          g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${p.life})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+
+      rafId = requestAnimationFrame(step);
+    }
+
+    function scheduleSpawn(){
+      if(!fireworksActive) return;
+      spawnRocket();
+      const delay = SPAWN_MIN + Math.random()*SPAWN_RANGE;
+      spawnTimer = setTimeout(scheduleSpawn, delay);
+    }
+
+    function startFireworks(){
+      if(rafId) return;
+      lastT = 0;
+      rafId = requestAnimationFrame(step);
+    }
+
+    function stopFireworks(){
+      fireworksActive = false;
+      clearTimeout(spawnTimer);
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      rockets = [];
+      particles = [];
+      ctx.clearRect(0, 0, W, H);
+    }
+
+    // pause off-screen / hidden tab to save battery and avoid jank on resume
+    document.addEventListener('visibilitychange', () => {
+      if(document.hidden){
+        fireworksActive = false;
+        clearTimeout(spawnTimer);
+        if(rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+      } else if(!window.__fireworksStopped){
+        fireworksActive = true;
+        scheduleSpawn();
+        startFireworks();
+      }
+    });
+
+    if(!prefersReducedMotion){
+      startFireworks();
+      scheduleSpawn();
+    }
+
+    // expose stop so the "нет"/"да" handlers below can turn it off
+    window.__stopFireworks = function(){
+      window.__fireworksStopped = true;
+      stopFireworks();
+    };
+  })();
 
   function stopFireworks(){
-    fireworksActive = false;
-    clearTimeout(fireworksTimer);
-    fireworksField.innerHTML = '';
-    activeFireworkCount = 0;
-  }
-
-  if(!prefersReducedMotion){
-    scheduleFirework();
+    if(window.__stopFireworks) window.__stopFireworks();
   }
 
   const screenQuestion = document.getElementById('screen-question');
@@ -773,7 +899,7 @@
     location.reload();
   });
 
-  const balloonColors = fwColors;
+  const balloonColors = ['#a34430', '#5c6b4e', '#a3823c', '#b6705a', '#7e3223', '#c9974f'];
 
   function launchBalloons(){
     const field = document.getElementById('balloon-field');
