@@ -522,6 +522,8 @@
 </head>
 <body>
 
+<audio id="bg-music" src="2_5433685240679802093.mp3" loop preload="auto"></audio>
+
 <div class="sky"></div>
 <canvas class="fireworks-bg" id="fireworks-bg"></canvas>
 <div class="stars" id="stars"></div>
@@ -1042,17 +1044,15 @@
   });
 
   // background music: starts on "да" click (user gesture, so autoplay is allowed), loops forever
-  const bgMusic = document.getElementById('bg-music');
   document.getElementById('btn-yes').addEventListener('click', () => {
+    const bgMusic = document.getElementById('bg-music');
     if(bgMusic){
       bgMusic.loop = true;
       bgMusic.currentTime = 0;
-      bgMusic.play().catch(() => {});
+      bgMusic.play().catch((err) => { console.error('bg-music play failed:', err); });
     }
   });
 </script>
-
-<audio id="bg-music" src="2_5433685240679802093.mp3" loop preload="auto"></audio>
 
 </body>
 </html>
