@@ -1040,7 +1040,19 @@
   letterOverlay.addEventListener('click', (e) => {
     if(e.target === letterOverlay) closeLetter();
   });
+
+  // background music: starts on "да" click (user gesture, so autoplay is allowed), loops forever
+  const bgMusic = document.getElementById('bg-music');
+  document.getElementById('btn-yes').addEventListener('click', () => {
+    if(bgMusic){
+      bgMusic.loop = true;
+      bgMusic.currentTime = 0;
+      bgMusic.play().catch(() => {});
+    }
+  });
 </script>
+
+<audio id="bg-music" src="2_5433685240679802093.mp3" loop preload="auto"></audio>
 
 </body>
 </html>
